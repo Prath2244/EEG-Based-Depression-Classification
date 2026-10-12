@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — NeuroCare{% endblock %}
+{% block content %}
+
+<div class="page-wrapper">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">Welcome back, <strong>{{ current_user.name }}</strong> — here's your overview</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('predict') }}" class="btn btn-primary-custom">
+        <i class="bi bi-cpu me-2"></i>New Prediction
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Stat Cards ── -->
+  <div class="row g-4 mb-4">
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card stat-card--blue">
+        <div class="stat-card__icon"><i class="bi bi-bar-chart-line-fill"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">{{ total }}</div>
+          <div class="stat-card__label">Total Predictions</div>
+        </div>
+        <div class="stat-card__badge"><i class="bi bi-arrow-up-right"></i></div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card stat-card--red">
+        <div class="stat-card__icon"><i class="bi bi-heartbreak-fill"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">{{ dep_count }}</div>
+          <div class="stat-card__label">Depression Cases</div>
+        </div>
+        <div class="stat-card__badge"><i class="bi bi-exclamation-triangle"></i></div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card stat-card--green">
+        <div class="stat-card__icon"><i class="bi bi-heart-fill"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">{{ no_dep }}</div>
+          <div class="stat-card__label">Normal Cases</div>
+        </div>
+        <div class="stat-card__badge"><i class="bi bi-check-circle"></i></div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card stat-card--purple">
+        <div class="stat-card__icon"><i class="bi bi-percent"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">
+            {% if total > 0 %}{{ "%.0f"|format(dep_count/total*100) }}%{% else %}—{% endif %}
+          </div>
+          <div class="stat-card__label">Detection Rate</div>
+        </div>
+        <div class="stat-card__badge"><i class="bi bi-graph-up"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Charts Row ── -->
+  <div class="row g-4 mb-4">
+    <!-- Donut Chart -->
+    <div class="col-lg-5">
+      <div class="card-custom h-100">
+        <div class="card-custom__header">
+          <div>
+            <h5 class="card-custom__title">Prediction Distribution</h5>
+            <p class="card-custom__sub">Depression vs Normal</p>
+          </div>
+          <div class="card-icon-badge blue"><i class="bi bi-pie-chart-fill"></i></div>
+        </div>
+        <div class="card-custom__body d-flex flex-column align-items-center justify-content-center">
+          {% if total > 0 %}
+          <div style="max-width:260px;width:100%">
+            <canvas id="donutChart"></canvas>
+          </div>
+          <div class="chart-legend mt-3 d-flex gap-4">
+            <div class="chart-legend-item">
+              <span class="legend-dot" style="background:#e74c3c"></span>
+              <span>Depression ({{ dep_count }})</span>
+            </div>
+            <div class="chart-legend-item">
+              <span class="legend-dot" style="background:#27ae60"></span>
+              <span>Normal ({{ no_dep }})</span>
+            </div>
+          </div>
+          {% else %}
+          <div class="empty-state">
+            <i class="bi bi-pie-chart"></i>
+            <p>No predictions yet</p>
+            <a href="{{ url_for('predict') }}" class="btn btn-sm btn-outline-primary">Make first prediction</a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk Level Bar Chart -->
+    <div class="col-lg-7">
+      <div class="card-custom h-100">
+        <div class="card-custom__header">
+          <div>
+            <h5 class="card-custom__title">Risk Level Breakdown</h5>
+            <p class="card-custom__sub">Distribution across severity levels</p>
+          </div>
+          <div class="card-icon-badge green"><i class="bi bi-bar-chart-fill"></i></div>
+        </div>
+        <div class="card-custom__body">
+          {% if total > 0 %}
+          <canvas id="levelChart" style="max-height:240px"></canvas>
+          {% else %}
+          <div class="empty-state">
+            <i class="bi bi-bar-chart"></i>
+            <p>No data to display</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Probability Trend ── -->
+  {% if prob_values %}
+  <div class="row g-4 mb-4">
+    <div class="col-12">
+      <div class="card-custom">
+        <div class="card-custom__header">
+          <div>
+            <h5 class="card-custom__title">Probability Trend</h5>
+            <p class="card-custom__sub">Last {{ prob_values|length }} predictions</p>
+          </div>
+          <div class="card-icon-badge purple"><i class="bi bi-graph-up-arrow"></i></div>
+        </div>
+        <div class="card-custom__body">
+          <canvas id="trendChart" style="max-height:200px"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Latest 5 Predictions ── -->
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="card-custom">
+        <div class="card-custom__header">
+          <div>
+            <h5 class="card-custom__title">Recent Predictions</h5>
+            <p class="card-custom__sub">Your last 5 analyses</p>
+          </div>
+          <a href="{{ url_for('history') }}" class="btn btn-sm btn-outline-primary">
+            View All <i class="bi bi-arrow-right ms-1"></i>
+          </a>
+        </div>
+        <div class="card-custom__body p-0">
+          {% if latest_5 %}
+          <div class="table-responsive">
+            <table class="table table-custom mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date &amp; Time</th>
+                  <th>Prediction</th>
+                  <th>Probability</th>
+                  <th>Risk Level</th>
+                  <th>Report</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in latest_5 %}
+                <tr>
+                  <td class="text-muted small">#{{ p.id }}</td>
+                  <td>
+                    <div class="fw-500">{{ p.timestamp.strftime('%d %b %Y') }}</div>
+                    <div class="text-muted small">{{ p.timestamp.strftime('%H:%M') }}</div>
+                  </td>
+                  <td>
+                    {% if p.prediction == 'Depression' %}
+                    <span class="badge-custom badge-danger">{{ p.prediction }}</span>
+                    {% else %}
+                    <span class="badge-custom badge-success">{{ p.prediction }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="prob-bar-wrap">
+                      <div class="prob-bar-fill" style="width:{{ p.probability }}%;background:{% if p.probability >= 85 %}#e74c3c{% elif p.probability >= 65 %}#e67e22{% elif p.probability >= 40 %}#f39c12{% else %}#27ae60{% endif %}"></div>
+                    </div>
+                    <span class="small fw-600">{{ "%.1f"|format(p.probability) }}%</span>
+                  </td>
+                  <td>
+                    <span class="level-badge level-{{ p.level.lower().replace(' ','') }}">
+                      {{ p.level }}
+                    </span>
+                  </td>
+                  <td>
+                    <a href="{{ url_for('download_report', pred_id=p.id) }}" class="btn-icon-sm" title="Download PDF">
+                      <i class="bi bi-file-earmark-arrow-down-fill"></i>
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty-state py-5">
+            <i class="bi bi-inbox"></i>
+            <p>No predictions yet. <a href="{{ url_for('predict') }}">Make your first one!</a></p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const depCount   = {{ dep_count }};
+const noDepCount = {{ no_dep }};
+const levelData  = {{ level_counts | tojson }};
+const probValues = {{ prob_values | tojson }};
+const timestamps = {{ timestamps | tojson }};
+
+// ── Donut Chart ──
+if (document.getElementById('donutChart') && (depCount + noDepCount) > 0) {
+  new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Depression', 'Normal'],
+      datasets: [{
+        data: [depCount, noDepCount],
+        backgroundColor: ['#e74c3c', '#27ae60'],
+        borderColor: '#fff',
+        borderWidth: 3,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/(depCount+noDepCount)*100)}%)`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Level Bar Chart ──
+if (document.getElementById('levelChart')) {
+  new Chart(document.getElementById('levelChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Normal', 'Mild Risk', 'Moderate', 'Severe'],
+      datasets: [{
+        label: 'Cases',
+        data: [levelData['Normal'], levelData['Mild Risk'], levelData['Moderate'], levelData['Severe']],
+        backgroundColor: ['#27ae60cc','#f39c12cc','#e67e22cc','#e74c3ccc'],
+        borderColor:     ['#27ae60',  '#f39c12',  '#e67e22',  '#e74c3c'],
+        borderWidth: 2,
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f0f4f8' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Trend Line ──
+if (document.getElementById('trendChart') && probValues.length > 0) {
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: timestamps,
+      datasets: [{
+        label: 'Depression Probability (%)',
+        data: probValues,
+        borderColor: '#1a6fc4',
+        backgroundColor: 'rgba(26,111,196,0.08)',
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointBackgroundColor: '#1a6fc4',
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, max: 100, grid: { color: '#f0f4f8' }, ticks: { callback: v => v + '%' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}
