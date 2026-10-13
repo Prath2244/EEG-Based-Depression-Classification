@@ -1,0 +1,581 @@
+{% extends 'base.html' %}
+{% block title %}Predict — NeuroCare{% endblock %}
+{% block content %}
+
+<div class="page-wrapper">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">EEG Depression Prediction</h1>
+      <p class="page-subtitle">Enter the 56 EEG biomarker values + Heart Rate Variability (HRV)</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetForm()">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Form
+      </button>
+      <button type="button" class="btn btn-outline-info btn-sm" onclick="fillSample()">
+        <i class="bi bi-lightning me-1"></i>Sample Data
+      </button>
+    </div>
+  </div>
+
+  {% if result %}
+  <!-- ══════════ RESULT BANNER ══════════ -->
+  <div class="result-banner result-banner--{{ 'depression' if result.is_depression else 'normal' }} mb-4" id="resultSection">
+    <div class="result-banner__icon">
+      <i class="bi bi-{% if result.is_depression %}exclamation-triangle-fill{% else %}check-circle-fill{% endif %}"></i>
+    </div>
+    <div class="result-banner__content">
+      <h3 class="result-banner__title">{{ result.prediction }}</h3>
+      <p class="result-banner__sub">Analysis complete — review the details below</p>
+    </div>
+    <div class="result-banner__prob">
+      <div class="prob-circle">
+        <svg viewBox="0 0 80 80">
+          <circle class="prob-circle-bg" cx="40" cy="40" r="34"/>
+          <circle class="prob-circle-fill" cx="40" cy="40" r="34"
+            stroke="{% if result.probability >= 85 %}#e74c3c{% elif result.probability >= 65 %}#e67e22{% elif result.probability >= 40 %}#f39c12{% else %}#27ae60{% endif %}"
+            stroke-dasharray="{{ result.probability * 2.136 }} 213.6"/>
+        </svg>
+        <span class="prob-circle-text">{{ result.probability }}%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <!-- Risk Level Card -->
+    <div class="col-md-4">
+      <div class="card-custom h-100">
+        <div class="card-custom__header">
+          <h5 class="card-custom__title">Risk Assessment</h5>
+          <div class="card-icon-badge {% if result.level == 'Normal' %}green{% elif result.level == 'Mild Risk' %}yellow{% elif result.level == 'Moderate' %}orange{% else %}red{% endif %}">
+            <i class="bi bi-shield-{% if result.level == 'Normal' %}check{% else %}exclamation{% endif %}"></i>
+          </div>
+        </div>
+        <div class="card-custom__body text-center py-3">
+
+          <!-- Level Badge -->
+          <div class="mb-3">
+            <div class="level-badge level-{{ result.level.lower().replace(' ','') }} level-badge--lg">
+              {% if result.level == 'Normal' %}<i class="bi bi-check-circle me-1"></i>
+              {% elif result.level == 'Mild Risk' %}<i class="bi bi-info-circle me-1"></i>
+              {% elif result.level == 'Moderate' %}<i class="bi bi-exclamation-circle me-1"></i>
+              {% else %}<i class="bi bi-exclamation-triangle me-1"></i>{% endif %}
+              {{ result.level }}
+            </div>
+          </div>
+
+          <!-- Big probability number -->
+          <div class="risk-prob-display mb-2">
+            <span class="risk-prob-num" style="color:{% if result.probability > 85 %}#e74c3c{% elif result.probability >= 65 %}#e67e22{% elif result.probability >= 40 %}#f39c12{% else %}#27ae60{% endif %}">
+              {{ result.probability }}%
+            </span>
+            <span class="risk-prob-label">Depression Probability</span>
+          </div>
+
+          <!-- Visual bar — clamped so even 0.31% shows a visible pip -->
+          <div class="prob-bar-wrap-lg mb-1">
+            <div class="prob-bar-fill-lg"
+              style="width:max({{ result.probability }}%, {% if result.probability > 0 %}4{% else %}0{% endif %}%);
+                     background:{% if result.probability > 85 %}#e74c3c{% elif result.probability >= 65 %}#e67e22{% elif result.probability >= 40 %}#f39c12{% else %}#27ae60{% endif %}">
+            </div>
+          </div>
+          <div class="d-flex justify-content-between mb-3" style="font-size:0.68rem;color:#94a3b8">
+            <span>0%</span><span>50%</span><span>100%</span>
+          </div>
+
+          <!-- HRV Display -->
+          {% if result.hrv %}
+          <div class="hrv-result-card mb-3">
+            <div class="hrv-result-icon"><i class="bi bi-heart-pulse-fill"></i></div>
+            <div>
+              <div class="fw-700">HRV: {{ result.hrv }} ms</div>
+              <div class="small text-muted">
+                {% if result.hrv < 25 %}Very Low — High stress indicator
+                {% elif result.hrv < 50 %}Low — Monitor closely
+                {% elif result.hrv < 70 %}Borderline — Mild concern
+                {% else %}Normal range
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- 4-segment scale -->
+          <div class="scale-bar">
+            <div class="scale-segment {% if result.level == 'Normal' %}scale-active{% endif %}" style="background:#27ae60">Normal</div>
+            <div class="scale-segment {% if result.level == 'Mild Risk' %}scale-active{% endif %}" style="background:#f39c12">Mild</div>
+            <div class="scale-segment {% if result.level == 'Moderate' %}scale-active{% endif %}" style="background:#e67e22">Moderate</div>
+            <div class="scale-segment {% if result.level == 'Severe' %}scale-active{% endif %}" style="background:#e74c3c">Severe</div>
+          </div>
+          <div class="scale-labels">
+            <span>0-40%</span><span>40-65%</span><span>65-85%</span><span>85-100%</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggestions Card -->
+    <div class="col-md-8">
+      <div class="card-custom h-100">
+        <div class="card-custom__header">
+          <div>
+            <h5 class="card-custom__title">Clinical Recommendations</h5>
+            <p class="card-custom__sub">Based on risk level: <strong>{{ result.level }}</strong></p>
+          </div>
+          <div class="card-icon-badge blue"><i class="bi bi-clipboard2-pulse-fill"></i></div>
+        </div>
+        <div class="card-custom__body">
+          <div class="suggestions-list">
+            {% for sug in result.suggestions %}
+            <div class="suggestion-item suggestion-item--{{ result.level.lower().replace(' ','') }}">
+              <div class="suggestion-icon"><i class="bi bi-check2-circle"></i></div>
+              <span>{{ sug }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="d-flex gap-3 mb-5 flex-wrap">
+    <a href="{{ url_for('download_report', pred_id=result.record_id) }}" class="btn btn-primary-custom">
+      <i class="bi bi-file-earmark-pdf-fill me-2"></i>Download PDF Report
+    </a>
+    <a href="{{ url_for('history') }}" class="btn btn-outline-primary">
+      <i class="bi bi-clock-history me-2"></i>View History
+    </a>
+    <button onclick="document.getElementById('predictionForm').scrollIntoView({behavior:'smooth'})" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-down me-2"></i>New Prediction
+    </button>
+  </div>
+  <hr class="mb-4"/>
+  {% endif %}
+
+  <!-- ══════════ CSV UPLOAD CARD ══════════ -->
+  <div class="csv-upload-card mb-4">
+    <div class="csv-upload-card__header">
+      <div class="d-flex align-items-center gap-3">
+        <div class="csv-upload-icon">
+          <i class="bi bi-file-earmark-spreadsheet-fill"></i>
+        </div>
+        <div>
+          <h5 class="csv-upload-title">Quick Fill from CSV File</h5>
+          <p class="csv-upload-sub">Upload a CSV file with EEG feature columns to auto-fill all 56 fields instantly</p>
+        </div>
+      </div>
+      <div class="csv-format-hint">
+        <i class="bi bi-info-circle me-1"></i>
+        CSV must have column headers matching EEG feature names (e.g. Fp1_alpha, F3_beta ...)
+      </div>
+    </div>
+    <div class="csv-upload-card__body">
+      <div class="csv-drop-zone" id="csvDropZone">
+        <input type="file" id="csvFileInput" accept=".csv" class="csv-file-input"/>
+        <div class="csv-drop-content" id="csvDropContent">
+          <div class="csv-drop-icon"><i class="bi bi-cloud-upload-fill"></i></div>
+          <div class="csv-drop-text">
+            <strong>Drag &amp; drop your CSV here</strong>
+            <span>or click to browse files</span>
+          </div>
+        </div>
+        <div class="csv-uploading d-none" id="csvUploading">
+          <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+          <span>Reading CSV file...</span>
+        </div>
+        <div class="csv-success d-none" id="csvSuccess">
+          <div class="csv-success-icon"><i class="bi bi-check-circle-fill"></i></div>
+          <div>
+            <div class="fw-700" id="csvSuccessText">File loaded successfully!</div>
+            <div class="small text-muted" id="csvSuccessDetail"></div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" onclick="clearCsvUpload()">
+            <i class="bi bi-x-circle me-1"></i>Clear
+          </button>
+        </div>
+        <div class="csv-error d-none" id="csvError">
+          <div class="csv-error-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+          <div class="fw-600 text-danger" id="csvErrorText">Upload failed</div>
+          <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearCsvUpload()">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Retry
+          </button>
+        </div>
+      </div>
+
+      <!-- Missing fields warning -->
+      <div class="csv-missing-warn d-none mt-3" id="csvMissingWarn">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <span id="csvMissingText">Some fields could not be filled from the CSV.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ HRV CARD — always visible at top of form ══════════ -->
+  <div class="hrv-card mb-4" id="predictionForm-top">
+    <div class="hrv-card__left">
+      <div class="hrv-icon-wrap">
+        <i class="bi bi-heart-pulse-fill"></i>
+      </div>
+      <div>
+        <h5 class="hrv-title">Heart Rate Variability (HRV)</h5>
+        <p class="hrv-sub">Enter HRV value in milliseconds (ms) — typically 20–200 ms</p>
+      </div>
+    </div>
+    <div class="hrv-card__right">
+      <div class="feature-input-group" style="min-width:200px">
+        <label class="feature-label">
+          <span class="feature-label-channel" style="background:#fee2e2;color:#dc2626">HRV</span>
+          <span class="feature-label-type">Heart Rate Variability (ms)</span>
+        </label>
+        <input type="number" step="any" name="hrv" id="hrv"
+               class="form-control feature-input hrv-input"
+               placeholder="e.g. 65.5"
+               min="0" max="500"
+               required/>
+      </div>
+      <div class="hrv-ref mt-2">
+        <span class="hrv-ref-item" style="color:#27ae60"><i class="bi bi-circle-fill me-1" style="font-size:6px"></i>Normal: 50-100 ms</span>
+        <span class="hrv-ref-item" style="color:#f39c12"><i class="bi bi-circle-fill me-1" style="font-size:6px"></i>Low: &lt;50 ms</span>
+        <span class="hrv-ref-item" style="color:#e74c3c"><i class="bi bi-circle-fill me-1" style="font-size:6px"></i>Very Low: &lt;20 ms</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ EEG FORM ══════════ -->
+  <form method="POST" action="{{ url_for('predict') }}" id="predictionForm" novalidate>
+
+    <!-- Hidden HRV - we copy value from the top card on submit -->
+    <input type="hidden" name="hrv" id="hrv_hidden"/>
+
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div class="card-custom">
+          <div class="card-custom__header">
+            <div>
+              <h5 class="card-custom__title"><i class="bi bi-cpu me-2 text-primary"></i>EEG Feature Input</h5>
+              <p class="card-custom__sub">56 biomarker features across 14 electrode channels • Expand each section</p>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="expandAll()">Expand All</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="collapseAll()">Collapse All</button>
+            </div>
+          </div>
+          <div class="card-custom__body">
+            <div class="info-banner mb-4">
+              <i class="bi bi-info-circle-fill"></i>
+              <div>
+                <strong>How to enter values:</strong> Enter the numeric EEG band power and statistical features
+                for each electrode. Alpha = 8-13 Hz, Beta = 13-30 Hz, Mean &amp; Std from time-series.
+                All fields accept decimal values.
+              </div>
+            </div>
+
+            {% set group_idx = namespace(val=0) %}
+            {% for group_name, fields in groups.items() %}
+            {% set group_idx.val = group_idx.val + 1 %}
+            <div class="accordion-group mb-3">
+              <button type="button" class="accordion-toggle {% if group_idx.val == 1 %}open{% endif %}"
+                      onclick="toggleAccordion(this)">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="accordion-icon"><i class="bi bi-broadcast-pin"></i></div>
+                  <div>
+                    <span class="accordion-title">{{ group_name }}</span>
+                    <span class="accordion-meta">{{ fields|length }} features</span>
+                  </div>
+                </div>
+                <i class="bi bi-chevron-down accordion-chevron {% if group_idx.val == 1 %}rotated{% endif %}"></i>
+              </button>
+              <div class="accordion-body {% if group_idx.val == 1 %}open{% endif %}">
+                <div class="row g-3 p-3">
+                  {% for col in fields %}
+                  <div class="col-sm-6 col-md-4 col-lg-3">
+                    <div class="feature-input-group">
+                      <label class="feature-label">
+                        <span class="feature-label-channel">{{ col.split('_')[0] }}</span>
+                        <span class="feature-label-type">
+                          {% if '_alpha' in col %}α Alpha
+                          {% elif '_beta' in col %}β Beta
+                          {% elif '_mean' in col %}μ Mean
+                          {% elif '_std' in col %}σ Std
+                          {% endif %}
+                        </span>
+                      </label>
+                      <input type="number" step="any" name="{{ col }}" id="{{ col }}"
+                             class="form-control feature-input"
+                             placeholder="e.g. 35.4" required/>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit Bar -->
+    <div class="predict-submit-bar">
+      <div class="d-flex gap-3 align-items-center flex-wrap">
+        <button type="submit" class="btn btn-predict" id="predictBtn">
+          <span class="btn-predict-icon"><i class="bi bi-cpu-fill"></i></span>
+          <span class="btn-predict-text">Run EEG Analysis</span>
+          <span class="btn-predict-spinner d-none" id="spinner">
+            <span class="spinner-border spinner-border-sm"></span> Analysing...
+          </span>
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+          <i class="bi bi-arrow-counterclockwise me-2"></i>Reset
+        </button>
+        <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>All 56 EEG fields + HRV must be filled</span>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sampleData = {
+  "Fp1_alpha":39.03,"Fp1_beta":18.55,"Fp1_mean":-14.77,"Fp1_std":4.22,
+  "Fp2_alpha":47.24,"Fp2_beta":19.31,"Fp2_mean":-1.93,"Fp2_std":0.64,
+  "F3_alpha":51.19,"F3_beta":8.87,"F3_mean":-2.50,"F3_std":1.99,
+  "F4_alpha":24.99,"F4_beta":27.41,"F4_mean":-2.26,"F4_std":5.14,
+  "C3_alpha":35.36,"C3_beta":27.15,"C3_mean":-5.42,"C3_std":7.73,
+  "C4_alpha":35.96,"C4_beta":10.38,"C4_mean":-3.03,"C4_std":5.87,
+  "P3_alpha":41.69,"P3_beta":28.37,"P3_mean":-7.32,"P3_std":5.67,
+  "P4_alpha":38.12,"P4_beta":22.45,"P4_mean":-4.89,"P4_std":6.21,
+  "O1_alpha":44.50,"O1_beta":15.30,"O1_mean":-6.10,"O1_std":4.80,
+  "O2_alpha":42.30,"O2_beta":16.70,"O2_mean":-5.80,"O2_std":4.50,
+  "F7_alpha":38.00,"F7_beta":20.10,"F7_mean":-3.40,"F7_std":5.10,
+  "F8_alpha":36.50,"F8_beta":21.30,"F8_mean":-3.20,"F8_std":4.90,
+  "T3_alpha":40.20,"T3_beta":18.60,"T3_mean":-4.60,"T3_std":5.30,
+  "T4_alpha":39.80,"T4_beta":19.40,"T4_mean":-4.20,"T4_std":5.00
+};
+
+function fillSample() {
+  // Fill EEG fields
+  Object.keys(sampleData).forEach(k => {
+    const el = document.getElementById(k);
+    if (el) { el.value = sampleData[k]; el.classList.add('filled'); }
+  });
+  // Fill HRV
+  const hrvEl = document.getElementById('hrv');
+  if (hrvEl) { hrvEl.value = 65.5; hrvEl.classList.add('filled'); }
+  expandAll();
+}
+
+function resetForm() {
+  document.getElementById('predictionForm').reset();
+  document.getElementById('hrv').value = '';
+  document.querySelectorAll('.feature-input, .hrv-input').forEach(el => {
+    el.classList.remove('filled','is-invalid');
+  });
+}
+
+function showSpinner() {
+  const btn  = document.getElementById('predictBtn');
+  const text = btn.querySelector('.btn-predict-text');
+  const spin = document.getElementById('spinner');
+  const icon = btn.querySelector('.btn-predict-icon');
+  text.classList.add('d-none');
+  icon.classList.add('d-none');
+  spin.classList.remove('d-none');
+  btn.disabled = true;
+}
+
+function toggleAccordion(btn) {
+  const body    = btn.nextElementSibling;
+  const chevron = btn.querySelector('.accordion-chevron');
+  const isOpen  = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  chevron.classList.toggle('rotated', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+}
+function expandAll() {
+  document.querySelectorAll('.accordion-body').forEach(b => b.classList.add('open'));
+  document.querySelectorAll('.accordion-chevron').forEach(c => c.classList.add('rotated'));
+  document.querySelectorAll('.accordion-toggle').forEach(b => b.classList.add('open'));
+}
+function collapseAll() {
+  document.querySelectorAll('.accordion-body').forEach(b => b.classList.remove('open'));
+  document.querySelectorAll('.accordion-chevron').forEach(c => c.classList.remove('rotated'));
+  document.querySelectorAll('.accordion-toggle').forEach(b => b.classList.remove('open'));
+}
+
+// Copy HRV from top card into hidden form field before submit
+document.getElementById('predictionForm').addEventListener('submit', function(e) {
+  const hrvVal = document.getElementById('hrv').value.trim();
+
+  // Copy HRV into hidden input
+  document.getElementById('hrv_hidden').value = hrvVal;
+
+  // Validate HRV
+  if (!hrvVal || isNaN(parseFloat(hrvVal))) {
+    e.preventDefault();
+    const hrvEl = document.getElementById('hrv');
+    hrvEl.classList.add('is-invalid');
+    hrvEl.focus();
+    hrvEl.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+
+  // Validate EEG fields
+  const inputs = this.querySelectorAll('.feature-input[required]');
+  let hasError = false;
+  inputs.forEach(input => {
+    if (!input.value.trim() || isNaN(parseFloat(input.value))) {
+      input.classList.add('is-invalid');
+      hasError = true;
+    }
+  });
+  if (hasError) {
+    e.preventDefault();
+    const first = this.querySelector('.is-invalid');
+    if (first) {
+      const body = first.closest('.accordion-body');
+      if (body) {
+        body.classList.add('open');
+        const toggle = body.previousElementSibling;
+        if (toggle) {
+          toggle.classList.add('open');
+          const chevron = toggle.querySelector('.accordion-chevron');
+          if (chevron) chevron.classList.add('rotated');
+        }
+      }
+      first.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+    return;
+  }
+
+  showSpinner();
+});
+
+// Scroll to result on load
+window.addEventListener('load', () => {
+  const rs = document.getElementById('resultSection');
+  if (rs) setTimeout(() => rs.scrollIntoView({behavior:'smooth', block:'start'}), 300);
+});
+
+// ── CSV Upload Logic ──
+const csvDropZone  = document.getElementById('csvDropZone');
+const csvFileInput = document.getElementById('csvFileInput');
+
+csvDropZone.addEventListener('click', () => csvFileInput.click());
+
+csvDropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  csvDropZone.classList.add('dragging');
+});
+csvDropZone.addEventListener('dragleave', () => csvDropZone.classList.remove('dragging'));
+csvDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  csvDropZone.classList.remove('dragging');
+  const file = e.dataTransfer.files[0];
+  if (file) handleCsvFile(file);
+});
+
+csvFileInput.addEventListener('change', function() {
+  if (this.files[0]) handleCsvFile(this.files[0]);
+});
+
+async function handleCsvFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    showCsvError('Please upload a CSV file (.csv)');
+    return;
+  }
+
+  // Show loading
+  document.getElementById('csvDropContent').classList.add('d-none');
+  document.getElementById('csvUploading').classList.remove('d-none');
+  document.getElementById('csvSuccess').classList.add('d-none');
+  document.getElementById('csvError').classList.add('d-none');
+  document.getElementById('csvMissingWarn').classList.add('d-none');
+
+  try {
+    const formData = new FormData();
+    formData.append('csv_file', file);
+    const res  = await fetch('/upload_csv_predict', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showCsvError(data.error || 'Upload failed');
+      return;
+    }
+
+    // Fill EEG fields
+    let filled = 0;
+    Object.keys(data.values).forEach(k => {
+      const el = document.getElementById(k);
+      if (el) {
+        el.value = data.values[k];
+        el.classList.add('filled');
+        el.classList.remove('is-invalid');
+        filled++;
+      }
+    });
+
+    // Fill HRV if found
+    if (data.hrv !== null && data.hrv !== undefined) {
+      const hrvEl = document.getElementById('hrv');
+      if (hrvEl) { hrvEl.value = data.hrv; hrvEl.classList.add('filled'); }
+    }
+
+    // Show success
+    document.getElementById('csvUploading').classList.add('d-none');
+    document.getElementById('csvSuccess').classList.remove('d-none');
+    document.getElementById('csvSuccessText').textContent =
+      `${file.name} — ${filled} fields filled`;
+    document.getElementById('csvSuccessDetail').textContent =
+      data.row_count > 1
+        ? `Used row 1 of ${data.row_count} rows. ${data.hrv ? 'HRV auto-filled.' : 'HRV not found in CSV.'}`
+        : `Single row CSV. ${data.hrv ? 'HRV auto-filled.' : 'Enter HRV manually.'}`;
+
+    // Show missing warning
+    if (data.missing && data.missing.length > 0) {
+      document.getElementById('csvMissingWarn').classList.remove('d-none');
+      document.getElementById('csvMissingText').textContent =
+        `${data.missing.length} field(s) not found in CSV: ${data.missing.slice(0,5).join(', ')}${data.missing.length > 5 ? '...' : ''}. Please fill them manually.`;
+    }
+
+    // Expand all sections so user can review
+    expandAll();
+
+  } catch(e) {
+    showCsvError('Network error: ' + e.message);
+  }
+}
+
+function showCsvError(msg) {
+  document.getElementById('csvDropContent').classList.add('d-none');
+  document.getElementById('csvUploading').classList.add('d-none');
+  document.getElementById('csvSuccess').classList.add('d-none');
+  document.getElementById('csvError').classList.remove('d-none');
+  document.getElementById('csvErrorText').textContent = msg;
+}
+
+function clearCsvUpload() {
+  csvFileInput.value = '';
+  document.getElementById('csvDropContent').classList.remove('d-none');
+  document.getElementById('csvUploading').classList.add('d-none');
+  document.getElementById('csvSuccess').classList.add('d-none');
+  document.getElementById('csvError').classList.add('d-none');
+  document.getElementById('csvMissingWarn').classList.add('d-none');
+  csvDropZone.classList.remove('dragging');
+}
+
+// ── Live HRV input highlight
+document.getElementById('hrv').addEventListener('input', function() {
+  if (this.value && !isNaN(parseFloat(this.value))) {
+    this.classList.add('filled');
+    this.classList.remove('is-invalid');
+  } else {
+    this.classList.remove('filled');
+  }
+});
+</script>
+{% endblock %}
