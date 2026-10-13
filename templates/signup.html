@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}Sign Up — NeuroCare{% endblock %}
+{% block content %}
+
+<div class="auth-wrapper">
+  <div class="auth-left">
+    <div class="auth-left-content">
+      <div class="auth-brand-icon mb-4">
+        <i class="bi bi-activity"></i>
+      </div>
+      <h1 class="auth-hero-title">Join<br/>NeuroCare</h1>
+      <p class="auth-hero-sub">Start your EEG-based depression<br/>analysis journey today.</p>
+
+      <div class="auth-info-box mt-5">
+        <h6 class="fw-700 mb-3">
+          <i class="bi bi-info-circle me-2"></i>About This System
+        </h6>
+        <p class="small opacity-80 mb-2">
+          This platform uses a <strong>Hybrid Meta-Learning Model</strong> trained on
+          56 EEG biomarkers to classify depression risk with clinical-grade accuracy.
+        </p>
+        <p class="small opacity-80 mb-0">
+          All predictions are securely stored and can be downloaded as PDF reports
+          for clinical review.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <h2 class="auth-card-title">Create Account</h2>
+        <p class="auth-card-sub">Fill in your details to get started</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }} alert-sm mb-3">
+            <i class="bi bi-{% if cat=='success' %}check-circle{% else %}exclamation-triangle{% endif %} me-2"></i>{{ msg }}
+          </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('signup') }}" novalidate>
+        <div class="form-group-custom mb-3">
+          <label class="form-label-custom">Full Name</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-person input-icon"></i>
+            <input type="text" name="name" class="form-control form-control-custom"
+                   placeholder="Dr. John Smith" value="{{ name or '' }}" required/>
+          </div>
+        </div>
+
+        <div class="form-group-custom mb-3">
+          <label class="form-label-custom">Email Address</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-envelope input-icon"></i>
+            <input type="email" name="email" class="form-control form-control-custom"
+                   placeholder="you@example.com" value="{{ email or '' }}" required/>
+          </div>
+        </div>
+
+        <div class="form-group-custom mb-3">
+          <label class="form-label-custom">Password</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-lock input-icon"></i>
+            <input type="password" name="password" id="signupPassword"
+                   class="form-control form-control-custom"
+                   placeholder="Minimum 6 characters" required/>
+            <button type="button" class="btn-eye" onclick="togglePassword('signupPassword', this)">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group-custom mb-4">
+          <label class="form-label-custom">Confirm Password</label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-lock-fill input-icon"></i>
+            <input type="password" name="confirm_password" id="confirmPassword"
+                   class="form-control form-control-custom"
+                   placeholder="Re-enter password" required/>
+            <button type="button" class="btn-eye" onclick="togglePassword('confirmPassword', this)">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary-custom w-100 mb-3">
+          <i class="bi bi-person-plus-fill me-2"></i>Create Account
+        </button>
+
+        <p class="text-center text-muted small mb-0">
+          Already have an account?
+          <a href="{{ url_for('login') }}" class="link-primary fw-600">Sign in</a>
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
