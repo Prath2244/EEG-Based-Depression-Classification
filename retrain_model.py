@@ -3,7 +3,7 @@ retrain_model.py
 Run this ONCE inside your .venv to rebuild the model with YOUR sklearn version.
 Usage:  python retrain_model.py
 
-Place this file in the same folder as app.py (F:/Ajay R/abn_51/)
+Place this file in the same folder as app.py
 and make sure EEG_Real.csv or EEG_HRV_Updated.csv is also in that folder.
 """
 
