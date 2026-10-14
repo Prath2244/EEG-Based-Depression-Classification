@@ -1,9 +1,3 @@
-"""
-NeuroCare - EEG Depression Classifier
-Flask Web Application
-Developer: Ajay
-"""
-
 import os
 import csv
 import sys
